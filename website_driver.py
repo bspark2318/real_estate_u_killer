@@ -12,19 +12,17 @@ from handlers import QuizHandler, LessonHandler, ActivityHandler, WalkthroughHan
 class CourseType(Enum):
     QUIZ = 'quiz'
     LESSON = 'lesson'
-    ACTICITY = 'activity'
+    ACTIVITY = 'activity'
     WALKTHROUGH = 'walkthrough'
     INFOGRAPHICS = 'infographics'
 
 class WebsiteDriver:
     def __init__(self, username, password):
         load_dotenv()
-        self.lesson_content = []
-        self.activity_content = []
-        self.quiz_content = []
-
         # Configure Chrome download preferences
-        download_dir = os.path.abspath("./downloads")  # Set your download directory
+        # Get project root directory (same directory as this file)
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        download_dir = os.path.join(script_dir, "saved", "infographics")
         os.makedirs(download_dir, exist_ok=True)
 
         chrome_options = webdriver.ChromeOptions()
@@ -65,6 +63,7 @@ class WebsiteDriver:
             self._begin_resume_course()
             while True: 
                 self._go_through_each_course()
+                time.sleep(3)
                 
         finally:
             self._close()
@@ -79,12 +78,29 @@ class WebsiteDriver:
                 self.quiz_handler.handle()
             case CourseType.LESSON:
                 self.lesson_handler.handle()
-            case CourseType.ACTICITY:
+            case CourseType.ACTIVITY:
                 self.activity_handler.handle()
             case CourseType.WALKTHROUGH:
                 self.walkthrough_handler.handle()
             case CourseType.INFOGRAPHICS:
                 self.infographics_handler.handle()
+                self._keep_going()
+        
+    def _keep_going(self):
+        """Check if there is a next button to continue to the next course"""
+        try:
+            resolved = False
+            while not resolved:
+                time.sleep(5)
+                next_button = self.driver.find_element(By.CSS_SELECTOR, 'button.next')
+                # Check if button has 'next-disabled' class
+                if 'next-disabled' in next_button.get_attribute('class'):
+                    continue 
+                next_button.click()
+                resolved = True
+                print("Navigated to next course.")
+        except:
+            print("No next button found, ending session.")
     
     def _determine_course_type(self):
         # Check for h1 elements (any h1)
@@ -103,7 +119,7 @@ class WebsiteDriver:
 
                 # Check if text matches "Activity #<number>"
                 if re.search(r'^Activity\s+#\d+', h1_text):
-                    return CourseType.ACTICITY
+                    return CourseType.ACTIVITY
         except:
             pass
 
@@ -124,7 +140,7 @@ class WebsiteDriver:
         # Check for activity elements
         try:
             self.driver.find_element(By.CSS_SELECTOR, 'div.activity-container')
-            return CourseType.ACTICITY
+            return CourseType.ACTIVITY
         except:
             pass
 

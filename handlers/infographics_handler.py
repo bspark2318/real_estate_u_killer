@@ -1,5 +1,6 @@
 import os
 import time
+from datetime import datetime
 from selenium.webdriver.common.by import By
 
 
@@ -21,10 +22,31 @@ class InfographicsHandler:
         # Wait for download to complete
         self._wait_for_download()
 
-        # Rename the downloaded file
-        # TODO: Get proper filename from page title or h1
-        self._rename_latest_download("infographic.pdf")
+        # Rename the downloaded file with a proper name
+        filename = self._get_file_name()
+        self._rename_latest_download(filename)
 
+    def _get_file_name(self):
+        """Generate filename from chapter and lesson headers with timestamp"""
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        try:
+            chapter_element = self.driver.find_element(By.CSS_SELECTOR, 'div.page-header-chapter.header-text')
+            lesson_element = self.driver.find_element(By.CSS_SELECTOR, 'div.page-header-lesson.header-text')
+
+            chapter_text = chapter_element.text.strip()
+            lesson_text = lesson_element.text.strip()
+
+            # Combine and sanitize for filename
+            filename = f"{chapter_text}_{lesson_text}_{timestamp}.pdf"
+            # Remove invalid filename characters and replace spaces with underscores
+            filename = filename.replace('/', '_').replace('\\', '_').replace(':', '_').replace(' ', '_')
+
+            return filename
+        except:
+            # Fallback to generic name if headers not found
+            return f"infographic_{timestamp}.pdf"
+    
     def _wait_for_download(self, timeout=30):
         """Wait for download to complete"""
         seconds = 0
