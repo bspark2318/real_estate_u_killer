@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import argparse
-from website_driver import login
-
+from website_driver import WebsiteDriver
 
 def main():
     parser = argparse.ArgumentParser(description='Login to Real Estate U')
@@ -10,7 +9,8 @@ def main():
 
     args = parser.parse_args()
 
-    login(args.username, args.password)
+    w_driver = WebsiteDriver(args.username, args.password)
+    w_driver.start_studying()
 
 
 if __name__ == '__main__':
