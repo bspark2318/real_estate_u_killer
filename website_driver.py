@@ -2,16 +2,60 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from dotenv import load_dotenv
+import os
 import time
+import re
+from enum import Enum
+from handlers import QuizHandler, LessonHandler, ActivityHandler, WalkthroughHandler, InfographicsHandler 
 
+class CourseType(Enum):
+    QUIZ = 'quiz'
+    LESSON = 'lesson'
+    ACTICITY = 'activity'
+    WALKTHROUGH = 'walkthrough'
+    INFOGRAPHICS = 'infographics'
 
 class WebsiteDriver:
     def __init__(self, username, password):
-        self.driver = webdriver.Chrome()  # or webdriver.Firefox()
+        load_dotenv()
+        self.lesson_content = []
+        self.activity_content = []
+        self.quiz_content = []
+
+        # Configure Chrome download preferences
+        download_dir = os.path.abspath("./downloads")  # Set your download directory
+        os.makedirs(download_dir, exist_ok=True)
+
+        chrome_options = webdriver.ChromeOptions()
+        prefs = {
+            "download.default_directory": download_dir,
+            "download.prompt_for_download": False,
+            "download.directory_upgrade": True,
+            "safebrowsing.enabled": True
+        }
+        chrome_options.add_experimental_option("prefs", prefs)
+
+        self.driver = webdriver.Chrome(options=chrome_options)
+        self.download_dir = download_dir
+        
+        if not username or not password:
+            if os.getenv('USERNAME') and os.getenv('PASSWORD'):
+                username = os.getenv('USERNAME')
+                password = os.getenv('PASSWORD')
+            else:
+                raise ValueError("Username and password must be provided either as arguments or in .env file")
         self.username = username
         self.password = password
-        self.wait = WebDriverWait(self.driver, 10) 
+        self.wait = WebDriverWait(self.driver, 10)
         self.url = 'https://courses.realestateu.com/login'
+
+        # Initialize handlers
+        self.quiz_handler = QuizHandler(self.driver, self.wait)
+        self.lesson_handler = LessonHandler(self.driver, self.wait)
+        self.activity_handler = ActivityHandler(self.driver, self.wait)
+        self.walkthrough_handler = WalkthroughHandler(self.driver, self.wait)
+        self.infographics_handler = InfographicsHandler(self.driver, self.wait, self.download_dir)
 
     def start_studying(self):
         """Start the studying session by navigating to the site"""
@@ -26,15 +70,72 @@ class WebsiteDriver:
             self._close()
         
     def _go_through_each_course(self):
-        print("Going a new course...")
-        self._scrape_course_content()
-        pass
-    I need to scrape this which should be so easy
-    <div class="transcript"><p>This is the module on listing requirements and agreements. In this lesson, you will learn about the requirements for listing agreements in New Jersey.</p><p>You have already learned about the different types of listing agreements in the national portion. Before we proceed to requirements that are specific to the state, let’s do a recap on what types of listing agreements are there and what they mean.</p><p>Listing agreements are legally binding contracts that authorize real estate brokerages to perform specific tasks for property owners, such as selling or renting their property.</p><p>The most common and preferred type of listing agreement is the Exclusive Right to Sell agreement. Under this agreement, the property owner authorizes one brokerage as their exclusive agent to sell or rent the property. The brokerage is entitled to compensation regardless of who ultimately finds the buyer or tenant.</p><p>The next option is an Exclusive Agency agreement, where the brokerage receives a commission only if they find the buyer, not if the owner secures the sale themselves.</p><p>Other agreement types include the Open Listing, which is non-exclusive and only pays the broker who produces the buyer, and the Net Listing, where the broker's compensation is the excess amount above an agreed-upon net sale price with the owner. Remember, net listings are illegal in NJ.</p><p>Now, let’s learn about the state specific requirements for listing agreements in the next lesson.</p></div>
+        print("Going through a new course...")
+        self._wait_to_load()
+        course_type = self._determine_course_type()
+        print(f"Course type determined: {course_type}")
+        match course_type:
+            case CourseType.QUIZ:
+                self.quiz_handler.handle()
+            case CourseType.LESSON:
+                self.lesson_handler.handle()
+            case CourseType.ACTICITY:
+                self.activity_handler.handle()
+            case CourseType.WALKTHROUGH:
+                self.walkthrough_handler.handle()
+            case CourseType.INFOGRAPHICS:
+                self.infographics_handler.handle()
     
-    def _scrape_course_content(self):
-        pass
-    
+    def _determine_course_type(self):
+        # Check for h1 elements (any h1)
+        try:
+            h1_elements = self.driver.find_elements(By.TAG_NAME, 'h1')
+            for h1_element in h1_elements:
+                h1_text = h1_element.text
+
+                # Check for "Attempt the Question"
+                if h1_text == "Attempt the Question":
+                    return CourseType.QUIZ
+
+                # Check if text ends with "Infographic" or "Infographics"
+                if re.search(r'Infographics?$', h1_text):
+                    return CourseType.INFOGRAPHICS
+
+                # Check if text matches "Activity #<number>"
+                if re.search(r'^Activity\s+#\d+', h1_text):
+                    return CourseType.ACTICITY
+        except:
+            pass
+
+        # Check for quiz elements (using the quiz__info class)
+        try:
+            self.driver.find_element(By.CSS_SELECTOR, 'div.quiz__info')
+            return CourseType.QUIZ
+        except:
+            pass
+
+        # Check for lesson elements
+        try:
+            self.driver.find_element(By.CSS_SELECTOR, 'div.page-lesson-container')
+            return CourseType.LESSON
+        except:
+            pass
+
+        # Check for activity elements
+        try:
+            self.driver.find_element(By.CSS_SELECTOR, 'div.activity-container')
+            return CourseType.ACTICITY
+        except:
+            pass
+
+        # Default to educational content
+        return CourseType.LESSON
+
+    def _wait_to_load(self):
+        """Wait for page to be fully loaded"""
+        self.wait.until(lambda driver: driver.execute_script('return document.readyState') == 'complete')
+        print("Page loaded.")
+        
     def _navigate_to_site(self):
         """Navigate to the Real Estate U website"""
         self.driver.get(self.url)

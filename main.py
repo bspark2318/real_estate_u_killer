@@ -4,8 +4,8 @@ from website_driver import WebsiteDriver
 
 def main():
     parser = argparse.ArgumentParser(description='Login to Real Estate U')
-    parser.add_argument('-u', '--username', required=True, help='Username')
-    parser.add_argument('-p', '--password', required=True, help='Password')
+    parser.add_argument('-u', '--username', required=False, help='Username', default="")
+    parser.add_argument('-p', '--password', required=False, help='Password', default="")
 
     args = parser.parse_args()
 
