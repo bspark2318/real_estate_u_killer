@@ -1,14 +1,13 @@
 import os
 import time
-from datetime import datetime
 from selenium.webdriver.common.by import By
+from .base_handler import BaseHandler
 
 
-class InfographicsHandler:
+class InfographicsHandler(BaseHandler):
     def __init__(self, driver, wait, download_dir):
-        self.driver = driver
-        self.wait = wait
-        self.download_dir = download_dir
+        super().__init__(driver, wait)
+        self.temp_download_dir = download_dir
 
     def handle(self):
         """Handle infographics page - download PDF"""
@@ -22,30 +21,30 @@ class InfographicsHandler:
         # Wait for download to complete
         self._wait_for_download()
 
-        # Rename the downloaded file with a proper name
-        filename = self._get_file_name()
-        self._rename_latest_download(filename)
+        # Move and rename the downloaded file
+        self._move_and_rename_download()
 
-    def _get_file_name(self):
-        """Generate filename from chapter and lesson headers with timestamp"""
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    def _move_and_rename_download(self):
+        """Move downloaded file to chapter/lesson directory structure"""
+        lesson_text = self._get_lesson_text()
+        directory = self._create_directory_path("infographics")
 
-        try:
-            chapter_element = self.driver.find_element(By.CSS_SELECTOR, 'div.page-header-chapter.header-text')
-            lesson_element = self.driver.find_element(By.CSS_SELECTOR, 'div.page-header-lesson.header-text')
+        # Get the latest downloaded file from temp directory
+        files = os.listdir(self.temp_download_dir)
+        paths = [os.path.join(self.temp_download_dir, f) for f in files if not f.endswith('.crdownload')]
+        if not paths:
+            print("No downloaded file found")
+            return
 
-            chapter_text = chapter_element.text.strip()
-            lesson_text = lesson_element.text.strip()
+        latest_file = max(paths, key=os.path.getctime)
 
-            # Combine and sanitize for filename
-            filename = f"{chapter_text}_{lesson_text}_{timestamp}.pdf"
-            # Remove invalid filename characters and replace spaces with underscores
-            filename = filename.replace('/', '_').replace('\\', '_').replace(':', '_').replace(' ', '_')
+        # Create new filepath with lesson text
+        filename = f"{lesson_text}.pdf" if lesson_text else "infographic.pdf"
+        new_filepath = os.path.join(directory, filename)
 
-            return filename
-        except:
-            # Fallback to generic name if headers not found
-            return f"infographic_{timestamp}.pdf"
+        # Move and rename
+        os.rename(latest_file, new_filepath)
+        print(f"Saved infographic to: {new_filepath}")
     
     def _wait_for_download(self, timeout=30):
         """Wait for download to complete"""
@@ -53,20 +52,8 @@ class InfographicsHandler:
         while seconds < timeout:
             time.sleep(1)
             # Check if there are any .crdownload files (Chrome's temporary download files)
-            downloading = [f for f in os.listdir(self.download_dir) if f.endswith('.crdownload')]
+            downloading = [f for f in os.listdir(self.temp_download_dir) if f.endswith('.crdownload')]
             if not downloading:
                 return True
             seconds += 1
         return False
-
-    def _rename_latest_download(self, new_name):
-        """Rename the most recently downloaded file"""
-        files = os.listdir(self.download_dir)
-        paths = [os.path.join(self.download_dir, f) for f in files if not f.endswith('.crdownload')]
-        if not paths:
-            return None
-        latest_file = max(paths, key=os.path.getctime)
-        new_path = os.path.join(self.download_dir, new_name)
-        os.rename(latest_file, new_path)
-        print(f"Renamed download to: {new_name}")
-        return new_path

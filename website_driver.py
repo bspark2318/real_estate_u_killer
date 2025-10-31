@@ -14,7 +14,9 @@ class CourseType(Enum):
     LESSON = 'lesson'
     ACTIVITY = 'activity'
     WALKTHROUGH = 'walkthrough'
+    WALKTHROUGH_QUESTION = 'walkthrough_question'
     INFOGRAPHICS = 'infographics'
+    INTRODDUCTION = 'introduction'
 
 class WebsiteDriver:
     def __init__(self, username, password):
@@ -78,17 +80,26 @@ class WebsiteDriver:
                 self.quiz_handler.handle()
             case CourseType.LESSON:
                 self.lesson_handler.handle()
+                self._keep_going()
             case CourseType.ACTIVITY:
                 self.activity_handler.handle()
+                self._keep_going()
             case CourseType.WALKTHROUGH:
-                self.walkthrough_handler.handle()
+                self._keep_going()
             case CourseType.INFOGRAPHICS:
                 self.infographics_handler.handle()
                 self._keep_going()
+            case CourseType.WALKTHROUGH_QUESTION:
+                self.activity_handler.handle(False)
+                self._keep_going()
+            case _:
+                self._keep_going()
+                
         
     def _keep_going(self):
         """Check if there is a next button to continue to the next course"""
         try:
+            print("Continuing to next section...")
             resolved = False
             while not resolved:
                 time.sleep(5)
@@ -111,15 +122,18 @@ class WebsiteDriver:
 
                 # Check for "Attempt the Question"
                 if h1_text == "Attempt the Question":
-                    return CourseType.QUIZ
+                    return CourseType.WALKTHROUGH_QUESTION
 
-                # Check if text ends with "Infographic" or "Infographics"
-                if re.search(r'Infographics?$', h1_text):
-                    return CourseType.INFOGRAPHICS
+                if h1_text == "Introduction":
+                    return CourseType.INTRODDUCTION
+
+                if h1_text == "Question Walkthrough Introduction":
+                    return CourseType.WALKTHROUGH
 
                 # Check if text matches "Activity #<number>"
                 if re.search(r'^Activity\s+#\d+', h1_text):
                     return CourseType.ACTIVITY
+
         except:
             pass
 
@@ -129,18 +143,22 @@ class WebsiteDriver:
             return CourseType.QUIZ
         except:
             pass
-
-        # Check for lesson elements
+        
+        # Check for infographics by looking for both print and download buttons
         try:
-            self.driver.find_element(By.CSS_SELECTOR, 'div.page-lesson-container')
-            return CourseType.LESSON
+            print_button = self.driver.find_element(By.CSS_SELECTOR, 'button[data-testid="print__button"]')
+            download_button = self.driver.find_element(By.CSS_SELECTOR, 'button[data-testid="get-file__download-button"]')
+            if print_button and download_button:
+                return CourseType.INFOGRAPHICS
         except:
             pass
 
         # Check for activity elements
         try:
-            self.driver.find_element(By.CSS_SELECTOR, 'div.activity-container')
-            return CourseType.ACTIVITY
+            activity_container = self.driver.find_element(By.CSS_SELECTOR, 'div.activity-container')
+            if activity_container:
+                return CourseType.ACTIVITY
+
         except:
             pass
 

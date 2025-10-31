@@ -1,18 +1,11 @@
 import random
-import os
-from datetime import datetime
 from selenium.webdriver.common.by import By
+from .base_handler import BaseHandler
 
-class ActivityHandler:
-    def __init__(self, driver, wait):
-        self.driver = driver
-        self.wait = wait
-        # Get project root directory (one level up from handlers/)
-        script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.activities_dir = os.path.join(script_dir, "saved", "activities")
-        os.makedirs(self.activities_dir, exist_ok=True)
 
-    def handle(self):
+class ActivityHandler(BaseHandler):
+
+    def handle(self, is_acitivity=True):
         """Handle activity page"""
         # Try to make selections, if it fails go straight to review
         try:
@@ -22,36 +15,20 @@ class ActivityHandler:
         except Exception as e:
             print(f"Could not make selections (possibly already submitted): {e}")
 
-        # Review answers
-        scraped_content = self._review_answers()
-
-        # Save to file
-        filename = self._get_section_name() + ".md"
-        filepath = os.path.join(self.activities_dir, filename)
-        with open(filepath, 'w', encoding='utf-8') as f:
-            f.write(scraped_content)
-        print(f"Saved activity review to: {filepath}")
+        if is_acitivity:
+            scraped_content = self._review_activity_answers()
+            self._save_activity(scraped_content)
+        else:
+            scraped_content = self._review_walkthrough_answers()
+            self._save_walkthrough(scraped_content)
     
-    def _get_section_name(self):
-        """Generate filename from chapter and lesson headers with timestamp"""
-        timestamp = datetime.now().strftime("%Y%m%d")
+    def _save_activity(self, content):
+        """Save activity content"""
+        self._save_content(content, "activities")
 
-        try:
-            chapter_element = self.driver.find_element(By.CSS_SELECTOR, 'div.page-header-chapter.header-text')
-            lesson_element = self.driver.find_element(By.CSS_SELECTOR, 'div.page-header-lesson.header-text')
-
-            chapter_text = chapter_element.text.strip()
-            lesson_text = lesson_element.text.strip()
-
-            # Combine and sanitize for filename
-            filename = f"{chapter_text}_{lesson_text}_{timestamp}"
-            # Remove invalid filename characters and replace spaces with underscores
-            filename = filename.replace('/', '-').replace('\\', '-').replace(':', '-').replace(' ', '_')
-
-            return filename
-        except:
-            # Fallback to generic name if headers not found
-            return f"activity_{timestamp}"
+    def _save_walkthrough(self, content):
+        """Save walkthrough content"""
+        self._save_content(content, "walkthroughs")
 
     def _make_selections(self):
         """Randomly select an answer for a given question element"""
@@ -76,8 +53,34 @@ class ActivityHandler:
         # Wait for page to load (document ready state)
         self.wait.until(lambda driver: driver.execute_script('return document.readyState') == 'complete')
         print("New page loaded after submission") 
+        
+    def _review_walkthrough_answers(self):
+        """Review walkthrough answers and format as markdown"""
+        # Get the question/answer content
+        question_content = self._review_activity_answers()
+        markdown_content = "# Walkthrough Review\n\n"
+        markdown_content += "## Walkthrough Question\n\n"
+        markdown_content += question_content
+
+        # Get the transcript content
+        
+        markdown_content += "## Educational Content\n\n"
+
+        try:
+            transcript_container = self.driver.find_element(By.CSS_SELECTOR, 'div.transcript')
+            paragraphs = transcript_container.find_elements(By.TAG_NAME, 'p')
+
+            for p in paragraphs:
+                if p.text.strip():
+                    markdown_content += f"{p.text}\n\n"
+        except Exception as e:
+            print(f"Could not find transcript: {e}")
+
+        markdown_content += "---\n\n"
+
+        return markdown_content
     
-    def _review_answers(self):
+    def _review_activity_answers(self):
         """Review answers and format as markdown"""
         questions_container = self.driver.find_element(By.CSS_SELECTOR, 'div.questions')
         all_children = questions_container.find_elements(By.XPATH, './child::*')
