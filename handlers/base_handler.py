@@ -45,13 +45,40 @@ class BaseHandler:
         os.makedirs(directory, exist_ok=True)
         return directory
 
+    def _get_next_file_number(self, directory):
+        """Get the next file number for the directory"""
+        if not os.path.exists(directory):
+            return 1
+
+        # Get all files in directory and extract numbers
+        files = os.listdir(directory)
+        numbers = []
+        for f in files:
+            # Extract number from filename like "1_filename.md"
+            if '_' in f:
+                try:
+                    num = int(f.split('_')[0])
+                    numbers.append(num)
+                except ValueError:
+                    pass
+
+        # Return next number
+        return max(numbers) + 1 if numbers else 1
+
     def _save_content(self, content, content_type, extension="md"):
-        """Save content to chapter/content_type directory structure"""
+        """Save content to chapter/content_type directory structure with numbered prefix"""
         lesson_text = self._get_lesson_text()
         directory = self._create_directory_path(content_type)
 
-        # Create filename with lesson text
-        filename = f"{lesson_text}.{extension}" if lesson_text else f"{content_type}.{extension}"
+        # Get next file number
+        file_number = self._get_next_file_number(directory)
+
+        # Create filename with number prefix and lesson text
+        if lesson_text:
+            filename = f"{file_number}_{lesson_text}.{extension}"
+        else:
+            filename = f"{file_number}_{content_type}.{extension}"
+
         filepath = os.path.join(directory, filename)
 
         with open(filepath, 'w', encoding='utf-8') as f:

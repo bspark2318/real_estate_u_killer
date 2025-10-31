@@ -38,8 +38,15 @@ class InfographicsHandler(BaseHandler):
 
         latest_file = max(paths, key=os.path.getctime)
 
-        # Create new filepath with lesson text
-        filename = f"{lesson_text}.pdf" if lesson_text else "infographic.pdf"
+        # Get next file number
+        file_number = self._get_next_file_number(directory)
+
+        # Create new filepath with number prefix and lesson text
+        if lesson_text:
+            filename = f"{file_number}_{lesson_text}.pdf"
+        else:
+            filename = f"{file_number}_infographic.pdf"
+
         new_filepath = os.path.join(directory, filename)
 
         # Move and rename
