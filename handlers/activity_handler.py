@@ -40,7 +40,7 @@ class ActivityHandler(BaseHandler):
             if radio_inputs:
                 # Randomly select one radio option
                 selected_option = random.choice(radio_inputs)
-                selected_option.click()
+                self.driver.execute_script("arguments[0].click();", selected_option)
                 print(f"Question {idx}: Selected random radio option")
                 continue
 
@@ -61,9 +61,9 @@ class ActivityHandler(BaseHandler):
                 
     def _submit_activity(self):
         """Submit the activity and wait for page to load"""
-        # Find and click submit button
+        # Find submit button and click using JavaScript to avoid overlay issues
         submit_button = self.driver.find_element(By.CSS_SELECTOR, 'button.btn.bp')
-        submit_button.click()
+        self.driver.execute_script("arguments[0].click();", submit_button)
         print("Clicked Submit button")
 
         # Wait for page to load (document ready state)
@@ -101,77 +101,125 @@ class ActivityHandler(BaseHandler):
         from selenium.webdriver.support import expected_conditions as EC
         from selenium.common.exceptions import StaleElementReferenceException
 
-        # Wait for questions container to be present
-        questions_container = self.wait.until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, 'div.questions'))
-        )
-
         markdown_content = "# Activity Review\n\n"
 
-        question_num = 0
-        i = 0
+        # Try standard structure first
+        try:
+            questions_container = self.wait.until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, 'div.questions'))
+            )
 
-        # Get initial count
-        all_children = questions_container.find_elements(By.XPATH, './child::*')
-        total_children = len(all_children)
+            question_num = 0
+            i = 0
 
-        while i < total_children:
-            try:
-                # Re-fetch elements to avoid stale references
-                all_children = questions_container.find_elements(By.XPATH, './child::*')
-                element = all_children[i]
+            # Get initial count
+            all_children = questions_container.find_elements(By.XPATH, './child::*')
+            total_children = len(all_children)
 
-                # Check if this is a question div
-                element_class = element.get_attribute('class')
-                if 'question' in element_class and 'question-message' not in element_class:
-                    question_num += 1
+            while i < total_children:
+                try:
+                    # Re-fetch elements to avoid stale references
+                    all_children = questions_container.find_elements(By.XPATH, './child::*')
+                    element = all_children[i]
 
-                    # Get question text
-                    question_text = element.find_element(By.CSS_SELECTOR, 'p').text
+                    # Check if this is a question div
+                    element_class = element.get_attribute('class')
+                    if 'question' in element_class and 'question-message' not in element_class:
+                        question_num += 1
 
-                    # Get all options
-                    options = element.find_elements(By.CSS_SELECTOR, 'div.option')
+                        # Get question text
+                        question_text = element.find_element(By.CSS_SELECTOR, 'p').text
 
-                    markdown_content += f"## Question {question_num}\n\n"
-                    markdown_content += f"**{question_text}**\n\n"
-                    markdown_content += "### Options:\n\n"
+                        # Get all options
+                        options = element.find_elements(By.CSS_SELECTOR, 'div.option')
 
-                    for option in options:
-                        try:
-                            option_text_elem = option.find_element(By.CSS_SELECTOR, 'span.option-content')
-                            option_text = option_text_elem.text
-                            option_class = option.get_attribute('class')
+                        markdown_content += f"## Question {question_num}\n\n"
+                        markdown_content += f"**{question_text}**\n\n"
+                        markdown_content += "### Options:\n\n"
 
-                            # Check if this was the correct answer
-                            if 'correct-feedback' in option_class or 'reveal-correct-feedback' in option_class:
-                                markdown_content += f"- **{option_text}** ✓ (Correct)\n"
-                            # Check if this was the user's incorrect answer
-                            elif 'incorrect-feedback' in option_class:
-                                markdown_content += f"- {option_text} ✗ (Your answer - Incorrect)\n"
-                            else:
-                                markdown_content += f"- {option_text}\n"
-                        except:
-                            pass
+                        for option in options:
+                            try:
+                                option_text_elem = option.find_element(By.CSS_SELECTOR, 'span.option-content')
+                                option_text = option_text_elem.text
+                                option_class = option.get_attribute('class')
 
-                    # Check if next sibling is the explanation
-                    if i + 1 < total_children:
-                        try:
-                            all_children = questions_container.find_elements(By.XPATH, './child::*')
-                            if i + 1 < len(all_children):  # Double-check bounds after refetch
-                                next_element = all_children[i + 1]
-                                next_class = next_element.get_attribute('class')
-                                if 'question-message' in next_class:
-                                    explanation = next_element.find_element(By.CSS_SELECTOR, 'p.feedback-container')
-                                    markdown_content += f"\n**Explanation:** {explanation.text}\n\n"
-                        except:
-                            pass
+                                # Check if this was the correct answer
+                                if 'correct-feedback' in option_class or 'reveal-correct-feedback' in option_class:
+                                    markdown_content += f"- **{option_text}** ✓ (Correct)\n"
+                                # Check if this was the user's incorrect answer
+                                elif 'incorrect-feedback' in option_class:
+                                    markdown_content += f"- {option_text} ✗ (Your answer - Incorrect)\n"
+                                else:
+                                    markdown_content += f"- {option_text}\n"
+                            except:
+                                pass
 
-                    markdown_content += "---\n\n"
+                        # Check if next sibling is the explanation
+                        if i + 1 < total_children:
+                            try:
+                                all_children = questions_container.find_elements(By.XPATH, './child::*')
+                                if i + 1 < len(all_children):  # Double-check bounds after refetch
+                                    next_element = all_children[i + 1]
+                                    next_class = next_element.get_attribute('class')
+                                    if 'question-message' in next_class:
+                                        explanation = next_element.find_element(By.CSS_SELECTOR, 'p.feedback-container')
+                                        markdown_content += f"\n**Explanation:** {explanation.text}\n\n"
+                            except:
+                                pass
 
-            except StaleElementReferenceException:
-                print(f"Stale element at index {i}, retrying...")
-                continue
+                        markdown_content += "---\n\n"
 
-            i += 1
+                except StaleElementReferenceException:
+                    print(f"Stale element at index {i}, retrying...")
+                    continue
 
-        return markdown_content
+                i += 1
+
+            return markdown_content
+
+        except Exception as e:
+            print(f"Standard structure not found: {e}")
+            print("Trying fill-gap structure...")
+
+        # Try fill-gap structure
+        try:
+            fill_gap_questions = self.driver.find_elements(By.CSS_SELECTOR, 'div.fill-gap-question')
+            print(f"Found {len(fill_gap_questions)} fill-gap questions")
+
+            for question_num, fill_gap in enumerate(fill_gap_questions, 1):
+                # Get question text directly from div.question
+                question_div = fill_gap.find_element(By.CSS_SELECTOR, 'div.question')
+                question_text = question_div.text.strip()
+
+                markdown_content += f"## Question {question_num}\n\n"
+                markdown_content += f"**{question_text}**\n\n"
+                markdown_content += "### Options:\n\n"
+
+                # Get all options from div.options
+                options = fill_gap.find_elements(By.CSS_SELECTOR, 'div.options > div.option')
+
+                for option in options:
+                    try:
+                        # Get option text from span.option-content
+                        option_text_elem = option.find_element(By.CSS_SELECTOR, 'span.option-content')
+                        option_text = option_text_elem.text
+                        option_class = option.get_attribute('class')
+
+                        # Check if this was the correct answer
+                        if 'correct-feedback' in option_class or 'reveal-correct-feedback' in option_class:
+                            markdown_content += f"- **{option_text}** ✓ (Correct)\n"
+                        # Check if this was the user's incorrect answer
+                        elif 'incorrect-feedback' in option_class:
+                            markdown_content += f"- {option_text} ✗ (Your answer - Incorrect)\n"
+                        else:
+                            markdown_content += f"- {option_text}\n"
+                    except Exception as opt_error:
+                        print(f"Error parsing option: {opt_error}")
+
+                markdown_content += "---\n\n"
+
+            return markdown_content
+
+        except Exception as e:
+            print(f"Fill-gap structure also failed: {e}")
+            return markdown_content

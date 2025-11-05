@@ -145,13 +145,6 @@ class WebsiteDriver:
             pass
         
         # Check for infographics by looking for both print and download buttons
-        try:
-            print_button = self.driver.find_element(By.CSS_SELECTOR, 'button[data-testid="print__button"]')
-            download_button = self.driver.find_element(By.CSS_SELECTOR, 'button[data-testid="get-file__download-button"]')
-            if print_button and download_button:
-                return CourseType.INFOGRAPHICS
-        except:
-            pass
 
         # Check for activity elements
         try:
@@ -159,6 +152,17 @@ class WebsiteDriver:
             if activity_container:
                 return CourseType.ACTIVITY
 
+        except:
+            pass
+            
+        try:
+            time.sleep(1)
+            print_button = self.driver.find_element(By.CSS_SELECTOR, 'button[data-testid="print__button"]')
+            download_button = self.driver.find_element(By.CSS_SELECTOR, 'button[data-testid="get-file__download-button"]')
+            pdf_container = self.driver.find_element(By.CSS_SELECTOR, 'div.pdf-container')
+            
+            if (print_button or download_button or pdf_container):
+                return CourseType.INFOGRAPHICS
         except:
             pass
 
