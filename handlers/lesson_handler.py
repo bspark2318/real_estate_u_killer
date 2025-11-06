@@ -16,15 +16,6 @@ class LessonHandler(BaseHandler):
 
     def _scrape_educational_content(self):
         """Scrape lesson content and format as markdown"""
-        # Wait for transcript div to be present
-        transcript_div = self.wait.until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, 'div.transcript'))
-        )
-
-        # Get all <p> tags within the transcript div
-        paragraphs = transcript_div.find_elements(By.TAG_NAME, 'p')
-
-        # Build markdown content
         markdown_content = "# Lesson\n\n"
 
         # Get lesson title if available
@@ -34,10 +25,25 @@ class LessonHandler(BaseHandler):
         except:
             pass
 
-        # Add paragraphs
-        for p in paragraphs:
-            if p.text.strip():
-                markdown_content += f"{p.text}\n\n"
+        # Try to find transcript div
+        try:
+            transcript_div = self.wait.until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, 'div.transcript'))
+            )
 
-        print(f"Scraped {len(paragraphs)} paragraphs")
-        return markdown_content
+            # Get all <p> tags within the transcript div
+            paragraphs = transcript_div.find_elements(By.TAG_NAME, 'p')
+
+            # Add paragraphs
+            for p in paragraphs:
+                if p.text.strip():
+                    markdown_content += f"{p.text}\n\n"
+
+            print(f"Scraped {len(paragraphs)} paragraphs from transcript")
+            return markdown_content
+
+        except Exception as e:
+            print(f"No transcript div found: {e}")
+            print("Lesson may not have scrapable content, skipping...")
+            markdown_content += "_No content available_\n\n"
+            return markdown_content

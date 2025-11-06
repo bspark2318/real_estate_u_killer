@@ -139,8 +139,10 @@ class QuizHandler(BaseHandler):
                     if spans:
                         option_text = spans[0].text.strip()
                         options.append(option_text)
-                        # Check if this is the correct answer
-                        if 'reveal-correct-feedback' in option_div.get_attribute('class') or 'correct-feedback' in option_div.get_attribute('class'):
+                        # Check if this is the correct answer (exclude incorrect-feedback)
+                        option_class = option_div.get_attribute('class')
+                        if ('reveal-correct-feedback' in option_class or 'correct-feedback' in option_class) and 'incorrect-feedback' not in option_class:
+                            print("correct answer seems to be ", option_text)
                             correct_answer = option_text
                             correct_index = idx
 

@@ -66,34 +66,44 @@ class WebsiteDriver:
             while True: 
                 self._go_through_each_course()
                 time.sleep(3)
-                
         finally:
             self._close()
         
     def _go_through_each_course(self):
         print("Going through a new course...")
-        self._wait_to_load()
-        course_type = self._determine_course_type()
-        print(f"Course type determined: {course_type}")
-        match course_type:
-            case CourseType.QUIZ:
-                self.quiz_handler.handle()
-            case CourseType.LESSON:
-                self.lesson_handler.handle()
+        try:
+            self._wait_to_load()
+            course_type = self._determine_course_type()
+            print(f"Course type determined: {course_type}")
+            match course_type:
+                case CourseType.QUIZ:
+                    self.quiz_handler.handle()
+                case CourseType.LESSON:
+                    self.lesson_handler.handle()
+                    self._keep_going()
+                case CourseType.ACTIVITY:
+                    self.activity_handler.handle()
+                    self._keep_going()
+                case CourseType.WALKTHROUGH:
+                    self._keep_going()
+                case CourseType.INFOGRAPHICS:
+                    self.infographics_handler.handle()
+                    self._keep_going()
+                case CourseType.WALKTHROUGH_QUESTION:
+                    self.activity_handler.handle(False)
+                    self._keep_going()
+                case _:
+                    self._keep_going()
+        except Exception as e:
+            print(f"\n{'='*60}")
+            print(f"ERROR: Handler failed with exception: {e}")
+            print(f"{'='*60}\n")
+            print("Attempting to recover by moving to next section...")
+            try:
                 self._keep_going()
-            case CourseType.ACTIVITY:
-                self.activity_handler.handle()
-                self._keep_going()
-            case CourseType.WALKTHROUGH:
-                self._keep_going()
-            case CourseType.INFOGRAPHICS:
-                self.infographics_handler.handle()
-                self._keep_going()
-            case CourseType.WALKTHROUGH_QUESTION:
-                self.activity_handler.handle(False)
-                self._keep_going()
-            case _:
-                self._keep_going()
+            except Exception as keep_going_error:
+                print(f"Could not click next button: {keep_going_error}")
+                print("Will retry on next iteration...")
                 
         
     def _keep_going(self):
@@ -116,6 +126,7 @@ class WebsiteDriver:
     def _determine_course_type(self):
         # Check for h1 elements (any h1)
         try:
+            time.sleep(2)
             h1_elements = self.driver.find_elements(By.TAG_NAME, 'h1')
             for h1_element in h1_elements:
                 h1_text = h1_element.text
@@ -156,7 +167,6 @@ class WebsiteDriver:
             pass
             
         try:
-            time.sleep(1)
             print_button = self.driver.find_element(By.CSS_SELECTOR, 'button[data-testid="print__button"]')
             download_button = self.driver.find_element(By.CSS_SELECTOR, 'button[data-testid="get-file__download-button"]')
             pdf_container = self.driver.find_element(By.CSS_SELECTOR, 'div.pdf-container')
